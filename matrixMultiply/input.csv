@@ -1,0 +1,2 @@
+Index,KernelName,gpu-id,queue-id,queue-index,pid,tid,grd,wgr,lds,scr,arch_vgpr,accum_vgpr,sgpr,wave_size,sig,obj,MeanOccupancyPerCU,MeanOccupancyPerActiveCU,GPUBusy,Wavefronts,L2CacheHit,SALUInsts,VALUInsts,SFetchInsts
+0,"sgemm_kernel(unsigned int, float const*, float const*, float*) [clone .kd]",1,0,0,211938,211938,1000000,1,0,0,16,0,128,32,0x0,0x7fe134484840,42.5694238105,42.5709986880,100.0000000000,1333333.0000000000,88.0014164638,2004.0000000000,10013.0000000000,4.0000000000

@@ -1,0 +1,4 @@
+pmc : L2CacheHit, WriteUnitStalled
+range: 0 : 1
+gpu: 0
+kernel: sgemm_kernel

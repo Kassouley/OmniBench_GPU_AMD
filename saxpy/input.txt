@@ -1,0 +1,4 @@
+pmc : MeanOccupancyPerCU, MeanOccupancyPerActiveCU, GPUBusy, Wavefronts, L2CacheHit, SALUInsts, VALUInsts, SFetchInsts
+range: 0 : 1
+gpu: 0
+kernel: saxpy_kernel

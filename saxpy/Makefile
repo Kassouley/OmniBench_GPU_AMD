@@ -37,7 +37,6 @@ $(BUILD_PATH)/common.o: $(COMMON_FILE)
 saxpy: $(OBJS_MEASURE)
 	@echo Building $@ . . .
 	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS) 
-	@roc-obj -d $@
 
 clean :
 	rm -rf ./build saxpy

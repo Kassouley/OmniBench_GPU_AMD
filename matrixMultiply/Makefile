@@ -17,7 +17,7 @@ CFLAGS += $(INC_FLAGS)
 
 .PHONY: $(BUILD_PATH)/kernel.o $(BUILD_PATH)/driver.o
 
-all: matrixMul 
+all: matrixMultiply 
 
 $(BUILD_PATH)/driver.o: $(DRIVER_FILE)
 	@echo Building $@ . . .
@@ -34,10 +34,9 @@ $(BUILD_PATH)/common.o: $(COMMON_FILE)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-matrixMul: $(OBJS_MEASURE)
+matrixMultiply: $(OBJS_MEASURE)
 	@echo Building $@ . . .
 	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS) 
-	@roc-obj -d $@
 
 clean :
-	rm -rf ./build matrixMul
+	rm -rf ./build matrixMultiply

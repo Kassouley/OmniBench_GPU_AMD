@@ -1,6 +1,5 @@
 #include <hip/hip_runtime.h>
 
-#ifdef BASIC
 __global__ void sgemm_kernel (unsigned int N, const float* a, const float* b, float* c)
 {
     const int row = blockIdx.x * blockDim.x + threadIdx.x;
@@ -16,4 +15,17 @@ __global__ void sgemm_kernel (unsigned int N, const float* a, const float* b, fl
     }
 }
 
-#endif
+void sgemm_cpu (unsigned int N, const float* a, const float* b, float* c)
+{
+    for(unsigned int i = 0; i < N; i++)
+    {
+        for(unsigned int j = 0; j < N; j++)
+        {
+            c[i*N+j] = 0;
+            for(unsigned int k = 0; k < N; k++)
+            {
+                c[i*N+j] += a[i*N+k] * b[k*N+j];
+            }
+        }
+    }
+}

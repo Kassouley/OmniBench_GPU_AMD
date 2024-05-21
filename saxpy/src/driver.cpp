@@ -8,21 +8,20 @@
 int main(int argc, char* argv[])
 {
     unsigned int size = 0;
-    unsigned int nwu, nrep, block_size;
-    if (argc != 5) 
+    unsigned int nrep, block_size;
+    if (argc != 4) 
     {
-        fprintf (stderr, "Usage: %s <size> <block size> <nb warmup> <nb rep>\n", argv[0]);
+        fprintf (stderr, "Usage: %s <size> <block size> <nb rep>\n", argv[0]);
         return 1;
     }
     else
     {
         size = atoi(argv[1]);
         block_size = atoi(argv[2]);
-        nwu = atoi(argv[3]);
-        nrep = atoi(argv[4]);
+        nrep = atoi(argv[3]);
     }
 
-    double tdiff[NB_META];
+    double tdiff = 0.0;
 
     srand(0);
     
@@ -32,8 +31,10 @@ int main(int argc, char* argv[])
 
     float* x = NULL;
     float* y = NULL;
+    float* y_check = NULL;
     x = (float *)malloc(size_bytes);
     y = (float *)malloc(size_bytes);
+    y_check = (float *)malloc(size_bytes);
     init_vector(x, size);
     init_vector(y, size);
 
@@ -43,40 +44,41 @@ int main(int argc, char* argv[])
     CHECK(hipMalloc(&d_y, size_bytes));
     CHECK(hipMemcpy(d_x, x, size_bytes, hipMemcpyHostToDevice));
     CHECK(hipMemcpy(d_y, y, size_bytes, hipMemcpyHostToDevice));
-    
-
-    for (unsigned int i_meta = 0; i_meta < NB_META; i_meta++)
-    {
-        if ( i_meta == 0 )
-        {
-            for (unsigned int i = 0; i < nwu; i++)
-            {
-                saxpy_kernel<<<dim3(grid_size), dim3(block_size), 0, hipStreamDefault>>>(a, d_x, d_y, size);
-            }
-        }
-        else
-        {
-            saxpy_kernel<<<dim3(grid_size), dim3(block_size), 0, hipStreamDefault>>>(a, d_x, d_y, size);
-        }
-
-        const double t1 = omp_get_wtime();
-        for (unsigned int i = 0; i < nrep; i++)
-        {
-            saxpy_kernel<<<dim3(grid_size), dim3(block_size), 0, hipStreamDefault>>>(a, d_x, d_y, size);
-        }
-        const double t2 = omp_get_wtime();
-
-        tdiff[i_meta] = t2 - t1;
+    CHECK(hipDeviceSynchronize());
         
+    printf("Check of saxpy (size=%d) with %d threads/block and %d blocks\n",size, block_size, grid_size);
+    saxpy_kernel<<<dim3(grid_size), dim3(block_size), 0, hipStreamDefault>>>(a, d_x, d_y, size);
+    CHECK(hipMemcpy(y_check, d_y, size_bytes, hipMemcpyDeviceToHost));
+    saxpy_cpu(a, x, &y, size);
+    for (unsigned int i = 0; i < size; i++)
+    {
+        if (y_check[i] != y[i])
+        {
+            printf("Check KO, i=%d, gpu_y=%f, cpu_y=%f\n",i,y_check[i],y[i]);
+            exit(EXIT_FAILURE);
+        }
     }
+    printf("Check OK\n");
 
+    printf("Execution of saxpy with %d threads/block and %d blocks\n",block_size, grid_size);
+    const double t1 = omp_get_wtime();
+    for (unsigned int i = 0; i < nrep; i++)
+    {
+        saxpy_kernel<<<dim3(grid_size), dim3(block_size), 0, hipStreamDefault>>>(a, d_x, d_y, size);
+        CHECK(hipDeviceSynchronize());
+    }
+    const double t2 = omp_get_wtime();
+    tdiff = (t2 - t1) / nrep;
+
+    CHECK(hipMemcpy(y, d_y, size_bytes, hipMemcpyDeviceToHost));
+
+    printf("Average Time : %.0f ns\n",tdiff*10e9);
+        
     CHECK(hipFree(d_x));
     CHECK(hipFree(d_y));
 
     free(x);
     free(y);
 
-    print_measure(block_size, size, nrep, tdiff);
-    
     return EXIT_SUCCESS;
 }

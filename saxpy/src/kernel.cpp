@@ -21,3 +21,11 @@ __global__ void saxpy_kernel(const float a, const float* d_x, float* d_y, const 
       }
 }
 #endif
+
+void saxpy_cpu(const float a, const float* x, float** y, const unsigned int size)
+{
+    for (int i = 0; i < size; i ++) 
+    {
+        (*y)[i] = a * x[i] + (*y)[i];
+    }
+}

@@ -10,7 +10,7 @@ void init_vector(float *v, int size)
     #pragma omp parallel for
     for (int i = 0; i < size; ++i) 
     {
-        v[i] = (float)(rand() % 10); // random values
+        v[i] = (float)rand() / (float)RAND_MAX; // random values
     }
 }
 
@@ -20,7 +20,7 @@ void init_matrix(unsigned int row, unsigned int col, float* array)
     {
         for (unsigned int j = 0; j < col; j++)
         {
-            array[i*col+j] = (float)(rand() % 10);
+            array[i*col+j] = (float)rand() / (float)RAND_MAX;
         }
     }
 }
@@ -41,15 +41,15 @@ void print_measure(unsigned int block_size, unsigned int data_size, unsigned int
 
     qsort (tdiff, NB_META, sizeof tdiff[0], cmp_uint64);
 
-    const double time_min  = (double)tdiff[0]/(double)nrep*1e9;
-    const double time_med  = (double)tdiff[NB_META/2]/(double)nrep*1e9;
+    const double time_min  = (double)tdiff[0]/(double)nrep*10e9;
+    const double time_med  = (double)tdiff[NB_META/2]/(double)nrep*10e9;
     const float stabilite  = (tdiff[NB_META/2] - tdiff[0]) * 100.0f / tdiff[0];
 
     double rate = 0.0, drate = 0.0;
     double t_tmp = 0.0;
     for (unsigned int i = 0; i < NB_META; i++)
     {
-        t_tmp = (double)tdiff[i]/(double)nrep * 1e9;
+        t_tmp = (double)tdiff[i]/(double)nrep * 10e9;
         rate += t_tmp;
         drate += t_tmp*t_tmp;
     }
@@ -58,8 +58,8 @@ void print_measure(unsigned int block_size, unsigned int data_size, unsigned int
   
     printf("-----------------------------------------------------\n");
 
-    printf("Time (minimum, ms): %13s %10.5f ms\n", "", time_min);
-    printf("Time (median, ms):  %13s %10.5f ms\n", "", time_med);
+    printf("Time (minimum, ns): %13s %10.5f ns\n", "", time_min);
+    printf("Time (median, ns):  %13s %10.5f ns\n", "", time_med);
     
     if (stabilite >= 10)
         printf("Bad Stability: %18s %10.2f %%\n", "", stabilite);
@@ -68,7 +68,7 @@ void print_measure(unsigned int block_size, unsigned int data_size, unsigned int
     else
         printf("Good Stability: %17s %10.2f %%\n", "", stabilite);
 
-    printf("\033[1m%s %9s \033[42m%10.0lf +- %.0lf ms\033[0m\n",
+    printf("\033[1m%s %9s \033[42m%10.0lf +- %.0lf ns\033[0m\n",
         "Average time:", "", rate, drate);
     printf("-----------------------------------------------------\n");
     

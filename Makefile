@@ -1,30 +1,61 @@
-ROCM_PATH ?= /opt/rocm
+ROCM_PATH 	?= /opt/rocm
+SRC_PATH	 = ./src
+INC_PATH	 = ./include
+BUILD_PATH 	 = ./build
+OBJ_PATH 	 = $(BUILD_PATH)/obj
+BIN_PATH	 = $(BUILD_PATH)/bin
 
-CC		   = $(ROCM_PATH)/llvm/bin/clang++
-# CFLAGS     = -fopenmp=libomp -target x86_64-pc-linux-gnu -fopenmp-targets=amdgcn-amd-amdhsa -Xopenmp-target=amdgcn-amd-amdhsa -march=gfx1030
-CC = hipcc
-CFLAGS = -O3 
+OPT 	?= NOPT
+DIM 	?= ONE_DIM
+CC 		 = hipcc
+CFLAGS	 = -O3 -D $(OPT) -D $(DIM) -fopenmp $(INC_FLAGS)
+KERNEL 	?= matrixMultiply
+
+ifeq ($(OPT), ROCBLAS)
+	LFLAGS += -lrocblas
+endif
+
+DIR_COMMON 		   := ./common
+SRC_COMMON_MEASURE := $(shell find $(DIR_COMMON)/$(SRC_PATH) -name '*.cpp' -not -name 'main_check.cpp')
+OBJ_COMMON_MEASURE := $(addprefix $(DIR_COMMON)/$(OBJ_PATH)/,$(notdir $(SRC_COMMON_MEASURE:.cpp=.o)))
+
+SRC_COMMON_CHECK := $(shell find $(DIR_COMMON)/$(SRC_PATH) -name '*.cpp' -not -name 'main.cpp')
+OBJ_COMMON_CHECK := $(addprefix $(DIR_COMMON)/$(OBJ_PATH)/,$(notdir $(SRC_COMMON_CHECK:.cpp=.o)))
+
+DIR_KERNEL 		   := ./$(KERNEL)_bench
+SRC_KERNEL_MEASURE := $(shell find $(DIR_KERNEL) -name '*.cpp' -not -name 'driver_check.cpp')
+OBJ_KERNEL_MEASURE := $(addprefix $(DIR_KERNEL)/$(OBJ_PATH)/,$(notdir $(SRC_KERNEL_MEASURE:.cpp=.o)))
+
+SRC_KERNEL_CHECK := $(shell find $(DIR_KERNEL) -name '*.cpp' -not -name 'driver.cpp')
+OBJ_KERNEL_CHECK := $(addprefix $(DIR_KERNEL)/$(OBJ_PATH)/,$(notdir $(SRC_KERNEL_CHECK:.cpp=.o)))
+
+INC_DIRS  := $(shell find $(DIR_KERNEL)/$(INC_PATH) $(DIR_COMMON)/$(INC_PATH) -type d)
+INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 
 
-kernels = matrixMultiply saxpy VmatrixMultiply Vsaxpy
+all: measure check
 
-all : $(kernels)
+$(DIR_COMMON)/$(OBJ_PATH)/%.o: $(DIR_COMMON)/$(SRC_PATH)/%.cpp
+	@mkdir -p $(dir $@)
+	@echo "Building $@ ..."
+	$(CC) -c $< -o $@ $(CFLAGS)
 
-matrixMultiply: matrixMultiply.cpp
-	$(CC) -o $@ $^ $(CFLAGS)
-	@roc-obj -d $@
+$(DIR_KERNEL)/$(OBJ_PATH)/%.o: $(DIR_KERNEL)/$(SRC_PATH)/%.cpp
+	@mkdir -p $(dir $@)
+	@echo "Building $@ ..."
+	$(CC) -c $< -o $@ $(CFLAGS)
 
-VmatrixMultiply: matrixMultiply.cpp
-	$(CC) -o $@ $^ $(CFLAGS) -fvectorize
-	@roc-obj -d $@
+kernel: $(DIR_KERNEL)/$(OBJ_PATH)/kernel.o
 
-saxpy: saxpy.cpp
-	$(CC) -o $@ $^ $(CFLAGS)
-	@roc-obj -d $@
+measure: $(OBJ_COMMON_MEASURE) $(OBJ_KERNEL_MEASURE)
+	@mkdir -p $(DIR_KERNEL)/$(BIN_PATH)
+	$(CC) -o $(DIR_KERNEL)/$(BIN_PATH)/$@ $^ $(CFLAGS) $(LFLAGS)
 
-Vsaxpy: saxpy.cpp
-	$(CC) -o $@ $^ $(CFLAGS) -fvectorize
-	@roc-obj -d $@
+check: $(OBJ_COMMON_CHECK) $(OBJ_KERNEL_CHECK)
+	@mkdir -p $(DIR_KERNEL)/$(BIN_PATH)
+	$(CC) -o $(DIR_KERNEL)/$(BIN_PATH)/$@ $^ $(CFLAGS) $(LFLAGS)
 
-clean :
-	rm *.s $(kernels) *:1*
+clean:
+	rm -rf $(DIR_COMMON)/build/
+	rm -rf $(DIR_KERNEL)/build/
+	

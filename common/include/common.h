@@ -17,5 +17,7 @@
 void init_vector(float *v, int size);
 void init_matrix(unsigned int row, unsigned int col, float* array);
 
+void current_datetime(char *buffer, size_t size);
+void log_printf(const char *format, ...);
 
 #endif

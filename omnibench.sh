@@ -93,34 +93,6 @@ usage() {
 
 
 ############################################################
-# IF ERROR                                                 #
-############################################################
-
-check_error()
-{
-  err=$?
-  if [ $err -ne 0 ]; then
-    echo -e "OmniBench: error in $0\n\t$1 ($err)"
-    echo "Script exit."
-    exit 1
-  fi
-}
-
-############################################################
-# ECHO VERBOSE                                             #
-############################################################
-
-eval_verbose()
-{
-  if [ "$verbose" == 1 ]; then
-    eval $@
-  elif [ "$verbose" == 0 ]; then
-    eval $@ > /dev/null
-  fi
-}
-
-
-############################################################
 # ARGS MANAGER                                             #
 ############################################################
 
@@ -184,7 +156,7 @@ check_args()
 
     KERNEL=$1
     OPT=$2
-    BIN_PATH=$WORKDIR/$KERNEL\_bench/build/bin
+    BIN_PATH=$WORKDIR/benchmark/$KERNEL/build/bin
     if [ "$grid_size" == "" ]; then
        grid_size=$((($PB_SIZE + $block_size - 1) / $block_size))
     fi
@@ -344,6 +316,80 @@ get_gpu_info()
 # MEASURE COMMAND                                          #
 ############################################################
 
+run_measure()
+{
+    METRICS="DurationNs MeanOccupancyPerCU MeanOccupancyPerActiveCU GPUBusy Wavefronts L2CacheHit SALUInsts VALUInsts SFetchInsts"
+    ROCPROF_OUTPUT=$TMPDIR/results.csv
+    ROCPROF_INPUT=./config/input.txt
+    # edit_input_file $KERNEL
+
+    create_output_csv_file "Kernel Optimisation ProblemSize BlockSize GridSize $METRICS"
+
+    log_printf "=== Benchmark $BENCH for $KERNEL ($OPT) with size: $PB_SIZE"
+
+    case "$BENCH" in
+        "basic") 
+              run_basic ;;
+        "blockSizeVar") 
+              run_blockSizeVar ;;
+        "gridSizeVar") 
+              run_gridSizeVar ;;
+        *) echo "OmniBench: "$BENCH" is not an available benchmark"; usage ;;
+    esac
+
+}
+
+run_blockSizeVar()
+{
+    build_driver measure $KERNEL $OPT
+    for block_size in $(seq $start $step $end) ; do
+        grid_size=$((($PB_SIZE + $block_size - 1) / $block_size))
+        echo_run "measure" $KERNEL $OPT $PB_SIZE $block_size $grid_size "($(( (block_size * 100) / end ))%)"
+        set_call_args $PB_SIZE $block_size $grid_size $nrep
+        rocprof_app
+        extract_rocprof_metrics_to $output
+    done
+    echo
+    echo "Result saved in '$output'"
+}
+
+run_gridSizeVar()
+{
+    build_driver measure $KERNEL $OPT
+    start=40
+    end=2
+    step=600
+    for grid_size in $(seq $start $step $end) ; do
+        echo_run "measure" $KERNEL $OPT $PB_SIZE $block_size $grid_size "($(( (grid_size * 100) / end ))%)"
+        set_call_args $PB_SIZE $block_size $grid_size $nrep
+        rocprof_app
+        extract_rocprof_metrics_to $output
+    done
+    echo
+    echo "Result saved in '$output'"
+}
+
+run_basic()
+{
+    build_driver measure $KERNEL $OPT
+    echo_run "measure" $KERNEL $OPT $PB_SIZE $block_size $grid_size
+    set_call_args $PB_SIZE $block_size $grid_size $nrep
+    rocprof_app
+    extract_rocprof_metrics_to $output
+    echo
+    echo "Result saved in '$output'"
+}
+
+call_driver()
+{
+    echo $BIN_PATH/measure $PB_SIZE $BLOCK_DIM $GRID_DIM $NB_REP
+}
+
+rocprof_app()
+{
+    eval_verbose rocprof -o $ROCPROF_OUTPUT -i $ROCPROF_INPUT --timestamp on --stats --basenames on $(call_driver) 
+}
+
 create_output_csv_file()
 {
     if [[ -z $output ]]; then
@@ -369,73 +415,6 @@ extract_rocprof_metrics_to()
         echo -n ",$metric_value" >> $1
     done
     echo "" >> $1
-}
-
-run_measure()
-{
-    METRICS="DurationNs MeanOccupancyPerCU MeanOccupancyPerActiveCU GPUBusy Wavefronts L2CacheHit SALUInsts VALUInsts SFetchInsts"
-    ROCPROF_OUTPUT=$TMPDIR/results.csv
-    ROCPROF_INPUT=./config/input.txt
-    # edit_input_file $KERNEL
-
-    create_output_csv_file "Kernel Optimisation ProblemSize BlockSize GridSize $METRICS"
-
-
-    case "$BENCH" in
-        "basic") 
-              run_basic ;;
-        "blockSizeVar") 
-              run_blockSizeVar ;;
-        "gridSizeVar") 
-              run_gridSizeVar ;;
-        *) echo "OmniBench: "$BENCH" is not an available benchmark"; usage ;;
-    esac
-
-}
-
-call_driver()
-{
-    echo $BIN_PATH/measure $PB_SIZE $BLOCK_DIM $GRID_DIM $NB_REP
-}
-
-run_blockSizeVar()
-{
-    build_driver measure $KERNEL $OPT
-    for block_size in $(seq $start $step $end) ; do
-        grid_size=$((($PB_SIZE + $block_size - 1) / $block_size))
-        echo_run "measure" $KERNEL $OPT $PB_SIZE $block_size $grid_size "($(( (block_size * 100) / end ))%)"
-        set_call_args $PB_SIZE $block_size $grid_size $nrep
-        eval_verbose rocprof -o $ROCPROF_OUTPUT -i $ROCPROF_INPUT --stats --basenames on $(call_driver) 
-        extract_rocprof_metrics_to $output
-    done
-    echo
-    echo "Result saved in '$output'"
-}
-
-run_gridSizeVar()
-{
-    build_driver measure $KERNEL $OPT
-    start=40
-    end=2
-    step=600
-    for grid_size in $(seq $start $step $end) ; do
-        echo_run "measure" $KERNEL $OPT $PB_SIZE $block_size $grid_size "($(( (grid_size * 100) / end ))%)"
-        set_call_args $PB_SIZE $block_size $grid_size $nrep
-        eval_verbose rocprof -o $ROCPROF_OUTPUT -i $ROCPROF_INPUT --stats --basenames on $(call_driver) 
-        extract_rocprof_metrics_to $output
-    done
-    echo
-    echo "Result saved in '$output'"
-}
-
-run_basic()
-{
-    build_driver measure $KERNEL $OPT
-    echo_run "measure" $KERNEL $OPT $PB_SIZE $block_size $grid_size
-    set_call_args $PB_SIZE $block_size $grid_size $nrep
-    eval_verbose rocprof -o $ROCPROF_OUTPUT -i $ROCPROF_INPUT --stats --basenames on $(call_driver) 
-    extract_rocprof_metrics_to $output
-    echo "Result saved in '$output'"
 }
 
 
@@ -472,7 +451,7 @@ run_check()
         mv $TMP_OUTPUT_CPU $SAVE_OUTPUT_CPU
     fi
 
-    echo "=== Compare output . . ."
+    log_printf "=== Compare output . . ."
     if [[ -f $SAVE_OUTPUT_CPU ]]; then
         python3 $WORKDIR/python/check.py $TMP_OUTPUT_GPU $SAVE_OUTPUT_CPU
     else
@@ -484,6 +463,36 @@ run_check()
 # UTILS                                                    #
 ############################################################
 
+check_error()
+{
+  err=$?
+  if [ $err -ne 0 ]; then
+    echo -e "OmniBench: error in $0\n\t$1 ($err)"
+    echo "Script exit."
+    exit 1
+  fi
+}
+
+eval_verbose()
+{
+  if [ "$verbose" == 1 ]; then
+    eval $@
+  elif [ "$verbose" == 0 ]; then
+    eval $@ > /dev/null
+  fi
+}
+
+current_datetime() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S')"
+}
+
+log_printf() {
+    local datetime=$(current_datetime)
+    local message="$*"
+    echo "[$datetime] $message" >> output.log
+    echo "$message"
+}
+
 echo_run()
 {
     echo -ne "\r=== Run $1 $2 $3 (size: $4, blockDim: $5, gridDim: $6) $7"
@@ -491,7 +500,7 @@ echo_run()
 
 build_driver()
 {
-  echo "=== Compilation $1 $2 ($3) . . ."
+  log_printf "=== Compilation $1 $2 ($3) . . ."
   eval_verbose make $1 KERNEL=$2 OPT=$3 DIM=$DIM
   eval_verbose make kernel KERNEL=$2 OPT=$3 -B
   check_error "compilation failed"
@@ -507,16 +516,17 @@ set_call_args()
     ONLY_GPU=$5
 }
 
-
+log_printf "================ START ================"
 
 WORKDIR=`realpath $(dirname $0)`
 TMPDIR="$WORKDIR/tmp"
 SAVEDIR="$WORKDIR/save"
-RESULTDIR="$WORKDIR/result"
+RESULTDIR="$WORKDIR/results"
 mkdir -p $TMPDIR
 mkdir -p $SAVEDIR
 mkdir -p $RESULTDIR
 cd $WORKDIR
 run_command $@
 
-rm tmp -rf
+# rm tmp -rf
+log_printf "================= END ================="

@@ -3,6 +3,7 @@
 #include <hip/hip_runtime.h>
 #include <math.h>
 #include "driver.h"
+#include "common.h"
 
 int main (int argc, char* argv[])
 {
@@ -35,6 +36,9 @@ int main (int argc, char* argv[])
 
     dim3 blockDim = GET_BLOCK_DIM(block_dim);
     dim3 gridDim = GET_GRID_DIM(grid_dim);
+
+    log_printf("=== Run benchmark with size: %d, blockDim(%d, %d, %d), gridDim(%d, %d, %d), nb_rep: %d\n", 
+                size, blockDim.x, blockDim.y, blockDim.z, gridDim.x, gridDim.y, gridDim.z, nb_rep);
 
     driver(size, blockDim, gridDim, nb_rep);
 }

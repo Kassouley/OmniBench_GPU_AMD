@@ -2,6 +2,7 @@ ROCM_PATH 	?= /opt/rocm
 SRC_PATH	 = ./src
 INC_PATH	 = ./include
 BUILD_PATH 	 = ./build
+BENCH_PATH 	 = ./benchmark
 OBJ_PATH 	 = $(BUILD_PATH)/obj
 BIN_PATH	 = $(BUILD_PATH)/bin
 
@@ -22,7 +23,7 @@ OBJ_COMMON_MEASURE := $(addprefix $(DIR_COMMON)/$(OBJ_PATH)/,$(notdir $(SRC_COMM
 SRC_COMMON_CHECK := $(shell find $(DIR_COMMON)/$(SRC_PATH) -name '*.cpp' -not -name 'main.cpp')
 OBJ_COMMON_CHECK := $(addprefix $(DIR_COMMON)/$(OBJ_PATH)/,$(notdir $(SRC_COMMON_CHECK:.cpp=.o)))
 
-DIR_KERNEL 		   := ./$(KERNEL)_bench
+DIR_KERNEL 		   := $(BENCH_PATH)/$(KERNEL)
 SRC_KERNEL_MEASURE := $(shell find $(DIR_KERNEL) -name '*.cpp' -not -name 'driver_check.cpp')
 OBJ_KERNEL_MEASURE := $(addprefix $(DIR_KERNEL)/$(OBJ_PATH)/,$(notdir $(SRC_KERNEL_MEASURE:.cpp=.o)))
 

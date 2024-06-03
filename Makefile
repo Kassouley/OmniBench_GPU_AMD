@@ -16,6 +16,11 @@ ifeq ($(OPT), ROCBLAS)
 	LFLAGS += -lrocblas
 endif
 
+MYDUR ?= 0
+ifeq ($(MYDUR), 1)
+	CFLAGS += -D MYDUR
+endif
+
 DIR_COMMON 		   := ./common
 SRC_COMMON_MEASURE := $(shell find $(DIR_COMMON)/$(SRC_PATH) -name '*.cpp' -not -name 'main_check.cpp')
 OBJ_COMMON_MEASURE := $(addprefix $(DIR_COMMON)/$(OBJ_PATH)/,$(notdir $(SRC_COMMON_MEASURE:.cpp=.o)))

@@ -37,7 +37,7 @@ Options:
 Arguments:
   <kernel>           Kernel to use (matrixMultiply, saxpy, matrixTranspose, matrixVectorMultiply, matrixCopy)
   <optimization>     Optimization type (NOPT, TILE, UNROLL, STRIDE)
-  <problem_dim>      Problem dimensions (size for vectors, size1xsize2 for matrices)
+  <problem_dim>      Problem dimensions (size for vectors, size for square matrices)
 
 EOF
 }
@@ -57,8 +57,8 @@ Options:
 
 Arguments:
   <kernel>           Kernel to use (matrixMultiply, saxpy, matrixTranspose, matrixVectorMultiply, matrixCopy)
-  <optimization>     Optimization type (NOPT, TILE, UNROLL, STRIDE)
-  <benchmark>        Benchmark type (Block size variation, Grid size variation, LDS size variation, Unroll size variation, Striding kernel with block size variation)
+  <optimization>     Optimization type (NOPT, TILE, UNROLL, STRIDE, ROCBLAS)
+  <benchmark>        Benchmark type (Block size variation, Grid size variation, LDS size variation, Unroll size variation)
   <problem_dim>      Problem dimensions (size for vectors, sizexsize for matrices)
 
 EOF
@@ -106,6 +106,8 @@ check_option()
     nrep=1
     plot=0
     plot_file="$WORKDIR/results/graph_$(date +%F-%T).png"
+    mydur=0
+    MYDUR_METRICS=""
 
     TEMP=$(getopt -o $opt_list_short \
                     -l $opt_list \
@@ -128,6 +130,7 @@ check_option()
                 esac ;;
             -b|--block-size) block_size=($2) ; shift 2 ;;
             -g|--grid-size) grid_size=($2) ; shift 2 ;;
+            --mydur) set_mydur ; shift ;;
             --rerun) rerun=1 ; shift ;;
             --) shift ; break ;;
             *) echo "No option $1."; usage ;;
@@ -173,6 +176,12 @@ check_args()
     fi
 }
 
+set_mydur()
+{
+    mydur=1
+    MYDUR_METRICS="MyDurationMin MyDurationMed Scalability "
+}
+
 ############################################################
 # RUN COMMAND                                              #
 ############################################################
@@ -191,7 +200,7 @@ run_command()
             run_check $@ ;;
         "measure" ) 
             opt_list_short="hvn:o:b:g:p::" ; 
-            opt_list="help,rerun,verbose,nrep:,output:,block-size:,grid-size:,plot::" ; 
+            opt_list="help,rerun,mydur,verbose,nrep:,output:,block-size:,grid-size:,plot::" ; 
             check_option $@
             check_args $ARGS
             run_measure $@ ;;
@@ -323,7 +332,7 @@ run_measure()
     ROCPROF_OUTPUT=$TMPDIR/results.csv
     ROCPROF_INPUT=./config/input.txt
 
-    create_output_csv_file "Kernel Optimisation ProblemSize BlockSize GridSize MyDurationMin MyDurationMed Scalability $METRICS"
+    create_output_csv_file "Kernel Optimisation ProblemSize BlockSize GridSize $MYDUR_METRICS$METRICS"
 
     log_printf "=== Benchmark $BENCH for $KERNEL ($OPT) with size: $PB_SIZE"
 
@@ -361,9 +370,9 @@ run_blockSizeVar()
 run_gridSizeVar()
 {
     build_driver measure $KERNEL $OPT
-    start=40
-    end=2
-    step=600
+    start=1
+    end=2000
+    step=2
     for grid_size in $(seq $start $step $end) ; do
         echo_run "measure" $KERNEL $OPT $PB_SIZE $block_size $grid_size "($(( (grid_size * 100) / end ))%)"
         set_call_args $PB_SIZE $block_size $grid_size $nrep
@@ -415,12 +424,14 @@ extract_rocprof_metrics_to()
     echo -n ",$BLOCK_DIM" >> $1
     echo -n ",$GRID_DIM" >> $1
 
-    time_min=$(grep 'time_min:' "$TMPDIR/measure_tmp.out" | cut -d ' ' -f 2)
-    time_med=$(grep 'time_med:' "$TMPDIR/measure_tmp.out" | cut -d ' ' -f 2)
-    stability=$(grep 'stability:' "$TMPDIR/measure_tmp.out" | cut -d ' ' -f 2)
-    echo -n ",$time_min" >> $1
-    echo -n ",$time_med" >> $1
-    echo -n ",$stability" >> $1
+    if [[ "$mydur" -eq 1 ]]; then
+        time_min=$(grep 'time_min:' "$TMPDIR/measure_tmp.out" | cut -d ' ' -f 2)
+        time_med=$(grep 'time_med:' "$TMPDIR/measure_tmp.out" | cut -d ' ' -f 2)
+        stability=$(grep 'stability:' "$TMPDIR/measure_tmp.out" | cut -d ' ' -f 2)
+        echo -n ",$time_min" >> $1
+        echo -n ",$time_med" >> $1
+        echo -n ",$stability" >> $1
+    fi
 
     for metric in $METRICS; do
         col_num=$(head -1 $ROCPROF_OUTPUT| tr ',' '\n' | nl -v 0 | grep $metric | awk '{print $1}')
@@ -489,7 +500,7 @@ echo_run()
 build_driver()
 {
   log_printf "=== Compilation $1 $2 ($3) . . ."
-  eval_verbose make $1 KERNEL=$2 OPT=$3 DIM=$DIM
+  eval_verbose make $1 KERNEL=$2 OPT=$3 DIM=$DIM MYDUR=$mydur
   eval_verbose make kernel KERNEL=$2 OPT=$3 -B
   check_error "compilation failed"
 }
@@ -509,10 +520,10 @@ log_printf "================ START ================"
 WORKDIR=`realpath $(dirname $0)`
 TMPDIR="$WORKDIR/tmp"
 RESULTDIR="$WORKDIR/results"
-mkdir -p $TMPDIR
-mkdir -p $RESULTDIR
-cd $WORKDIR
+mkdir -p "$TMPDIR"
+mkdir -p "$RESULTDIR"
+cd "$WORKDIR"
 run_command "$@"
 
-rm tmp -rf
+rm "$TMPDIR" -rf
 log_printf "================= END ================="

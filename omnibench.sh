@@ -101,13 +101,20 @@ check_option()
     input=""
     output=""
     type=""
-    block_size=32
     grid_size=""
     nrep=1
     plot=0
     plot_file="$WORKDIR/results/graph_$(date +%F-%T).png"
     mydur=0
     MYDUR_METRICS=""
+    block_size_values=""
+    block_size_start=32
+    block_size_end=32
+    block_size_step=1
+    grid_size_values=""
+    grid_size_start=""
+    grid_size_end=""
+    grid_size_step=1
 
     TEMP=$(getopt -o $opt_list_short \
                     -l $opt_list \
@@ -128,16 +135,29 @@ check_option()
                     "") plot=1; shift 2 ;;
                     *)  plot=1; plot_file="$2" ; shift 2 ;;
                 esac ;;
-            -b|--block-size) block_size=($2) ; shift 2 ;;
-            -g|--grid-size) grid_size=($2) ; shift 2 ;;
+            -b|--block-size)
+                block_size_values="$2"
+                shift 2 ;;
+            -g|--grid-size)
+                grid_size_values="$2"
+                shift 2 ;;
             --mydur) set_mydur ; shift ;;
-            --rerun) rerun=1 ; shift ;;
             --) shift ; break ;;
             *) echo "No option $1."; usage ;;
         esac
     done
     
-     ARGS=$@
+    IFS=',' read -r -a block_values <<< "$block_size_values"
+    block_size_start=${block_values[0]:-$block_size_start}
+    block_size_end=${block_values[1]:-$block_size_start}
+    block_size_step=${block_values[2]:-$block_size_step}
+
+    IFS=',' read -r -a grid_values <<< "$grid_size_values"
+    grid_size_start=${grid_values[0]:-$grid_size_start}
+    grid_size_end=${grid_values[1]:-$grid_size_start}
+    grid_size_step=${grid_values[2]:-$grid_size_step}
+
+    ARGS=$@
 }
 
 check_args()
@@ -161,9 +181,6 @@ check_args()
     KERNEL=$1
     OPT=$2
     BIN_PATH=$WORKDIR/benchmark/$KERNEL/build/bin
-    if [ "$grid_size" == "" ]; then
-       grid_size=$((($PB_SIZE + $block_size - 1) / $block_size))
-    fi
     DIM="ONE_DIM"
     start=8
     end=1024
@@ -371,8 +388,8 @@ run_gridSizeVar()
 {
     build_driver measure $KERNEL $OPT
     start=1
-    end=2000
-    step=2
+    end=10000
+    step=10
     for grid_size in $(seq $start $step $end) ; do
         echo_run "measure" $KERNEL $OPT $PB_SIZE $block_size $grid_size "($(( (grid_size * 100) / end ))%)"
         set_call_args $PB_SIZE $block_size $grid_size $nrep
@@ -385,13 +402,35 @@ run_gridSizeVar()
 
 run_basic()
 {
+    local counter=0
     build_driver measure $KERNEL $OPT
-    echo_run "measure" $KERNEL $OPT $PB_SIZE $block_size $grid_size
-    set_call_args $PB_SIZE $block_size $grid_size $nrep
-    rocprof_app
-    extract_rocprof_metrics_to $output
+    block_size_seq=$(seq $block_size_start $block_size_step $block_size_end)
+    for block_size in $block_size_seq ; do
+        if [ "$grid_size_values" == "" ]; then
+            grid_size_start=$((($PB_SIZE + $block_size - 1) / $block_size))
+            grid_size_end=$grid_size_start
+        fi
+        grid_size_seq=$(seq $grid_size_start $grid_size_step $grid_size_end)
+        for grid_size in $grid_size_seq; do
+            counter=$((counter+1))
+            echo_run "measure" $KERNEL $OPT $PB_SIZE $block_size $grid_size "($(percentage_finish $counter)%)"
+            set_call_args $PB_SIZE $block_size $grid_size $nrep
+            rocprof_app
+            extract_rocprof_metrics_to $output
+        done
+    done
     echo
     echo "Result saved in '$output'"
+}
+
+percentage_finish()
+{
+    local counter=$1
+    local length_block_seq=$(echo "$block_size_seq" | wc -l)
+    local length_grid_seq=$(echo "$grid_size_seq" | wc -l)
+    local total_lenght=$((length_block_seq+length_grid_seq))
+    local percentage=$(awk "BEGIN {print int($counter/$total_lenght*100)}")
+    echo $percentage
 }
 
 call_driver()
@@ -407,7 +446,7 @@ rocprof_app()
 create_output_csv_file()
 {
     if [[ -z $output ]]; then
-        output="$RESULTDIR/output_$(date +%F-%T).csv"
+        output="$RESULTDIR/"$KERNEL"_"$OPT"_"$PB_SIZE"_$(date +%F-%T).csv"
     fi
 
     if [[ ! -f "$output" ]]; then

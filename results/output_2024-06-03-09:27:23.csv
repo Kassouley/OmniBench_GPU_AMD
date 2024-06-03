@@ -1,1 +1,0 @@
-Kernel,Optimisation,ProblemSize,BlockSize,GridSize,MyDurationMin,MyDurationMed,Scalability,DurationNs,MeanOccupancyPerCU,MeanOccupancyPerActiveCU,GPUBusy,Wavefronts,L2CacheHit,SALUInsts,VALUInsts,SFetchInsts

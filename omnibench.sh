@@ -32,8 +32,6 @@ Usage:
 
 Options:
   -h, --help         Show this help message and exit
-  -s, --save-cpu     Save computation output for this run in save/check directory
-  --do-cpu           Force to check CPU output even if the output for this problem dim was already saved
   -v, --verbose      Enable verbose mode
 
 Arguments:
@@ -98,9 +96,7 @@ usage() {
 
 check_option()
 {
-    save_cpu=0
     verbose=0
-    do_cpu=0
     rerun=0
     input=""
     output=""
@@ -108,6 +104,8 @@ check_option()
     block_size=32
     grid_size=""
     nrep=1
+    plot=0
+    plot_file="$WORKDIR/results/graph_$(date +%F-%T).png"
 
     TEMP=$(getopt -o $opt_list_short \
                     -l $opt_list \
@@ -123,11 +121,14 @@ check_option()
             -o|--output) output=($2) ; shift 2 ;;
             -i|--input) input=($2) ; shift 2 ;;
             -n|--nrep) nrep=($2) ; shift 2 ;;
+            -p|--plot) 
+                case "$2" in
+                    "") plot=1; shift 2 ;;
+                    *)  plot=1; plot_file="$2" ; shift 2 ;;
+                esac ;;
             -b|--block-size) block_size=($2) ; shift 2 ;;
             -g|--grid-size) grid_size=($2) ; shift 2 ;;
-            -s|--save-cpu) save_cpu=1 ; shift ;;
             --rerun) rerun=1 ; shift ;;
-            --do-cpu) do_cpu=1 ; shift ;;
             --) shift ; break ;;
             *) echo "No option $1."; usage ;;
         esac
@@ -183,20 +184,20 @@ run_command()
     
     case "$CMD" in
         "check") 
-            opt_list_short="hvsb:g:" ; 
-            opt_list="help,save-cpu,verbose,do-cpu,block-size,grid-size" ; 
+            opt_list_short="hvb:g:" ; 
+            opt_list="help,verbose,block-size:,grid-size:" ; 
             check_option $@
             check_args $ARGS
             run_check $@ ;;
         "measure" ) 
-            opt_list_short="hvn:o:b:g:" ; 
-            opt_list="help,rerun,verbose,nrep,output,block-size,grid-size" ; 
+            opt_list_short="hvn:o:b:g:p::" ; 
+            opt_list="help,rerun,verbose,nrep:,output:,block-size:,grid-size:,plot::" ; 
             check_option $@
             check_args $ARGS
             run_measure $@ ;;
         "export" )
             opt_list_short="ho:i:" ; 
-            opt_list="help,output,input:" ; 
+            opt_list="help,output:,input:" ; 
             check_option $@
             check_args $ARGS
             run_export $@ ;;
@@ -321,9 +322,8 @@ run_measure()
     METRICS="DurationNs MeanOccupancyPerCU MeanOccupancyPerActiveCU GPUBusy Wavefronts L2CacheHit SALUInsts VALUInsts SFetchInsts"
     ROCPROF_OUTPUT=$TMPDIR/results.csv
     ROCPROF_INPUT=./config/input.txt
-    # edit_input_file $KERNEL
 
-    create_output_csv_file "Kernel Optimisation ProblemSize BlockSize GridSize $METRICS"
+    create_output_csv_file "Kernel Optimisation ProblemSize BlockSize GridSize MyDurationMin MyDurationMed Scalability $METRICS"
 
     log_printf "=== Benchmark $BENCH for $KERNEL ($OPT) with size: $PB_SIZE"
 
@@ -336,7 +336,6 @@ run_measure()
               run_gridSizeVar ;;
         *) echo "OmniBench: "$BENCH" is not an available benchmark"; usage ;;
     esac
-
 }
 
 run_blockSizeVar()
@@ -351,6 +350,12 @@ run_blockSizeVar()
     done
     echo
     echo "Result saved in '$output'"
+
+    if [ "$plot" == 1 ]; then
+        log_printf "=== Plot generation . . ."
+        python3 ./python/plot_from_csv.py "$output" "BlockSize" "DurationNs" --save_plot "$plot_file"
+        echo "Plot created in file $plot_file"
+    fi
 }
 
 run_gridSizeVar()
@@ -409,6 +414,14 @@ extract_rocprof_metrics_to()
     echo -n ",$PB_SIZE" >> $1
     echo -n ",$BLOCK_DIM" >> $1
     echo -n ",$GRID_DIM" >> $1
+
+    time_min=$(grep 'time_min:' "$TMPDIR/measure_tmp.out" | cut -d ' ' -f 2)
+    time_med=$(grep 'time_med:' "$TMPDIR/measure_tmp.out" | cut -d ' ' -f 2)
+    stability=$(grep 'stability:' "$TMPDIR/measure_tmp.out" | cut -d ' ' -f 2)
+    echo -n ",$time_min" >> $1
+    echo -n ",$time_med" >> $1
+    echo -n ",$stability" >> $1
+
     for metric in $METRICS; do
         col_num=$(head -1 $ROCPROF_OUTPUT| tr ',' '\n' | nl -v 0 | grep $metric | awk '{print $1}')
         metric_value=$(awk -F, -v col=$((col_num+1)) 'NR > 0 {print $col}' $ROCPROF_OUTPUT | tail -n 1)
@@ -429,34 +442,9 @@ call_driver_check()
 
 run_check()
 {
-    TMP_OUTPUT="$TMPDIR/"$KERNEL"_$PB_SIZE"
-    SAVE_OUTPUT="$SAVEDIR/"$KERNEL"_$PB_SIZE"
-
-    TMP_OUTPUT_CPU="$TMP_OUTPUT"_cpu.check_out
-    SAVE_OUTPUT_CPU="$SAVE_OUTPUT"_cpu.check_out
-    TMP_OUTPUT_GPU="$TMP_OUTPUT"_gpu.check_out
-
     build_driver check "$KERNEL" "$OPT"
-
-    if [[ ! -f "$SAVE_OUTPUT_CPU" || "$do_cpu" -eq 1 ]]; then   
-        set_call_args $PB_SIZE $block_size $grid_size $TMP_OUTPUT 0
-    else
-        set_call_args $PB_SIZE $block_size $grid_size $TMP_OUTPUT 1
-    fi
-    echo_run "check" $KERNEL $OPT $PB_SIZE $block_size $grid_size
-    echo
+    set_call_args $PB_SIZE $block_size $grid_sizes
     eval $(call_driver_check)
-    
-    if [[ "$save_cpu" -eq 1 ]]; then
-        mv $TMP_OUTPUT_CPU $SAVE_OUTPUT_CPU
-    fi
-
-    log_printf "=== Compare output . . ."
-    if [[ -f $SAVE_OUTPUT_CPU ]]; then
-        python3 $WORKDIR/python/check.py $TMP_OUTPUT_GPU $SAVE_OUTPUT_CPU
-    else
-        python3 $WORKDIR/python/check.py $TMP_OUTPUT_GPU $TMP_OUTPUT_CPU
-    fi
 }
 
 ############################################################
@@ -520,13 +508,11 @@ log_printf "================ START ================"
 
 WORKDIR=`realpath $(dirname $0)`
 TMPDIR="$WORKDIR/tmp"
-SAVEDIR="$WORKDIR/save"
 RESULTDIR="$WORKDIR/results"
 mkdir -p $TMPDIR
-mkdir -p $SAVEDIR
 mkdir -p $RESULTDIR
 cd $WORKDIR
-run_command $@
+run_command "$@"
 
-# rm tmp -rf
+rm tmp -rf
 log_printf "================= END ================="

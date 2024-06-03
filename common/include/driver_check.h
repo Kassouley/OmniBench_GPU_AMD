@@ -14,7 +14,7 @@
     
 #endif
 
-int driver_check_cpu(unsigned int size, char* file_name);
-int driver_check_gpu(unsigned int size, dim3 blockDim, dim3 gridDim, char* file_name);
+int driver_check(unsigned int size, float** out_cpu, float** out_gpu, unsigned int* size_out_ptr,
+                dim3 blockDim, dim3 gridDim);
 
 #endif

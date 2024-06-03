@@ -6,12 +6,23 @@ def main() :
     try:
         file1 = open(f'{sys.argv[1]}')
         file2 = open(f'{sys.argv[2]}')
-        errors = []
-        for line_f1, line_f2 in zip(file1, file2):
-            values_f1 = line_f1.split()
-            values_f2 = line_f2.split()
-            errors = [abs(float(a) - float(b)) for a, b in zip(values_f1, values_f2)]
-        max_error=max(errors)
+        max_error = 0
+        max_v1 = 0
+        max_v2 = 0
+        j=0
+        i=0
+        for value_f1, value_f2 in zip(file1, file2):
+            error = abs(float(value_f1) - float(value_f2))
+            if error > max_error :
+                j=i
+                max_v1 = value_f1
+                max_v2 = value_f2
+                max_error = error
+                if floor(log10(abs(max_error))) > -1 :
+                    break
+
+            i=i+1
+        print(max_v1,max_v2,j)
         if max_error == 0 :
             print("Kernel output is \u001b[42mcorrect\033[0m.")
         else :

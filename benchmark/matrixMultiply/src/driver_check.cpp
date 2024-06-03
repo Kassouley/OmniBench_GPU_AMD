@@ -37,7 +37,7 @@ int driver_check_cpu(unsigned int size, char* file_name)
     {
         for (unsigned int j = 0; j < size; j++)
         {
-            fprintf(output, "%f ", C[i*size+j]);
+            fprintf(output, "%f\n", C[i*size+j]);
         }
     }
     fclose(output);
@@ -82,7 +82,7 @@ int driver_check_gpu(unsigned int size, dim3 blockDim, dim3 gridDim, char* file_
     {
         for (unsigned int j = 0; j < size; j++)
         {
-            fprintf(output, "%f ", C[i*size+j]);
+            fprintf(output, "%f\n", C[i*size+j]);
         }
     }
     fclose(output);

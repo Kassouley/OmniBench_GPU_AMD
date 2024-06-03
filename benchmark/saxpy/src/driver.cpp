@@ -6,13 +6,14 @@
 #include "common.h"
 #include "driver.h"
 
-int driver (const unsigned int size, dim3 blockDim, dim3 gridDim, const unsigned int nb_rep)
+int driver (const unsigned int size, dim3 blockDim, dim3 gridDim, const unsigned int nrep, float tdiff[NB_META])
 {    
+    int nwu = 5;
     const size_t size_bytes = size * sizeof(float);
     const float a = 2.0f;
 
-    float* x = (float *)malloc(size_bytes);
-    float* y = (float *)malloc(size_bytes);
+    float* x = (float*)malloc(size_bytes);
+    float* y = (float*)malloc(size_bytes);
     init_vector(x, size);
     init_vector(y, size);
 
@@ -23,12 +24,11 @@ int driver (const unsigned int size, dim3 blockDim, dim3 gridDim, const unsigned
     HIP_CHECK_CALL(hipMemcpy(d_x, x, size_bytes, hipMemcpyHostToDevice));
     HIP_CHECK_CALL(hipMemcpy(d_y, y, size_bytes, hipMemcpyHostToDevice));
 
-    for (unsigned int i = 0; i < nb_rep; i++)
-    {
-        saxpy<<<gridDim, blockDim, 0, hipStreamDefault>>>(a, d_x, d_y, size);
-        HIP_CHECK_CALL(hipDeviceSynchronize());
-    }    
-       
+    kernelBenchmark(tdiff, nwu, nrep, 
+                    saxpy, 
+                    gridDim, blockDim, 0, hipStreamDefault, 
+                    a, d_x, d_y, size);
+
     HIP_CHECK_CALL(hipMemcpy(y, d_y, size_bytes, hipMemcpyDeviceToHost));
 
     HIP_CHECK_CALL(hipFree(d_x));

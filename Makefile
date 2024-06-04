@@ -15,6 +15,9 @@ KERNEL 	?= matrixMultiply
 ifeq ($(OPT), ROCBLAS)
 	LFLAGS += -lrocblas
 endif
+ifeq ($(OPT), TILE)
+	CFLAGS += -D TILE_SIZE=$(TILE_SIZE)
+endif
 
 MYDUR ?= 0
 ifeq ($(MYDUR), 1)

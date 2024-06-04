@@ -31,8 +31,7 @@ def plot_logarithmic(csv_file, col1, col2, save_plot=None):
     plt.grid(True, which="both", ls="--")
     
     # Régler l'axe X pour qu'il soit par pas de 32
-    plt.xticks(np.arange(0, max(x)+1, 64))
-    
+    plt.xticks(np.arange(0, max(x) + 1, 64))
     # Enregistrer le plot si un chemin est spécifié
     if save_plot:
         plt.savefig(save_plot)

@@ -1,5 +1,4 @@
 #include <hip/hip_runtime.h>
-#include <rocblas/rocblas.h>
 
 #ifdef TILE
 #ifndef TILE_SIZE
@@ -54,6 +53,7 @@ __global__ void matrixMultiply (unsigned int N, const float* a, const float* b, 
 }
 
 #elif defined(ROCBLAS)
+#include <rocblas/rocblas.h>
 void matrixMultiply (unsigned int N, const float* a, const float* b, float* c)
 {
     const float alpha = 1.0; 

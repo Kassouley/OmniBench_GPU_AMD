@@ -185,7 +185,7 @@ check_args()
     start=8
     end=1024
     step=8
-    if [[ "$KERNEL" -eq "matrixMultiply" && "$OPT" -ne "LINEAR" ]]; then
+    if [[ "$KERNEL" == "matrixMultiply" && "$OPT" != "LINEAR" ]]; then
         DIM="TWO_DIM"
         start=1
         end=32
@@ -403,9 +403,9 @@ run_gridSizeVar()
 run_basic()
 {
     local counter=0
-    build_driver measure $KERNEL $OPT
     block_size_seq=$(seq $block_size_start $block_size_step $block_size_end)
     for block_size in $block_size_seq ; do
+        build_driver measure $KERNEL $OPT 
         if [ "$grid_size_values" == "" ]; then
             grid_size_start=$((($PB_SIZE + $block_size - 1) / $block_size))
             grid_size_end=$grid_size_start
@@ -492,9 +492,21 @@ call_driver_check()
 
 run_check()
 {
-    build_driver check "$KERNEL" "$OPT"
-    set_call_args $PB_SIZE $block_size $grid_sizes
-    eval $(call_driver_check)
+    local counter=0
+    block_size_seq=$(seq $block_size_start $block_size_step $block_size_end)
+    for block_size in $block_size_seq ; do
+        build_driver check "$KERNEL" "$OPT"
+        if [ "$grid_size_values" == "" ]; then
+            grid_size_start=$((($PB_SIZE + $block_size - 1) / $block_size))
+            grid_size_end=$grid_size_start
+        fi
+        grid_size_seq=$(seq $grid_size_start $grid_size_step $grid_size_end)
+        for grid_size in $grid_size_seq; do
+            counter=$((counter+1))
+            set_call_args $PB_SIZE $block_size $grid_sizes
+            eval $(call_driver_check)
+        done
+    done
 }
 
 ############################################################
@@ -538,10 +550,10 @@ echo_run()
 
 build_driver()
 {
-  log_printf "=== Compilation $1 $2 ($3) . . ."
-  eval_verbose make $1 KERNEL=$2 OPT=$3 DIM=$DIM MYDUR=$mydur
-  eval_verbose make kernel KERNEL=$2 OPT=$3 -B
-  check_error "compilation failed"
+    log_printf "=== Compilation $1 $2 ($3) . . ."
+    eval_verbose make kernel KERNEL=$2 OPT=$3 DIM=$DIM MYDUR=$mydur TILE_SIZE=$block_size -B
+    eval_verbose make $1 KERNEL=$2 OPT=$3 DIM=$DIM MYDUR=$mydur 
+    check_error "compilation failed"
 }
 
 set_call_args()
@@ -554,7 +566,7 @@ set_call_args()
     ONLY_GPU=$5
 }
 
-log_printf "================ START ================"
+log_printf "============== OMNIBENCH =============="
 
 WORKDIR=`realpath $(dirname $0)`
 TMPDIR="$WORKDIR/tmp"

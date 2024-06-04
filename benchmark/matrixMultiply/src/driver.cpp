@@ -3,9 +3,10 @@
 #include <hip/hip_runtime.h>
 #include <math.h>
 #include "kernel.h"
+#include "driver.h"
 #include "common.h"
 
-int driver (const unsigned int size, dim3 blockDim, dim3 gridDim, const unsigned int nb_rep)
+int driver (const unsigned int size, dim3 blockDim, dim3 gridDim, const unsigned int nb_rep, float tdiff[NB_META])
 {
     const size_t size_bytes = size * size * sizeof(float);
 

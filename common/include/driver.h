@@ -14,7 +14,6 @@
 
 #define NB_META 31
 
-
 #ifdef MYDUR
 #define kernelBenchmark(tdiff, nwu, nrep, KERNEL, ...)   \
     hipEvent_t start, stop;  \

@@ -6,7 +6,6 @@
 #include "kernel.h"
 #include "common.h"
 
-
 int driver_check(unsigned int size, float** out_cpu, float** out_gpu, unsigned int* size_out_ptr,
                 dim3 blockDim, dim3 gridDim)
 {

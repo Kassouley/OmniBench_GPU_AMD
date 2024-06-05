@@ -6,9 +6,8 @@
 #include "common.h"
 #include "driver.h"
 
-int driver (const unsigned int size, dim3 blockDim, dim3 gridDim, const unsigned int nrep, float tdiff[NB_META])
+int driver (const unsigned int size, dim3 blockDim, dim3 gridDim, const unsigned int nrep, const unsigned int nwu, float tdiff[NB_META])
 {    
-    int nwu = 5;
     const size_t size_bytes = size * sizeof(float);
     const float a = 2.0f;
 

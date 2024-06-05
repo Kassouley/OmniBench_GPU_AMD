@@ -6,7 +6,7 @@
 #include "driver.h"
 #include "common.h"
 
-int driver (const unsigned int size, dim3 blockDim, dim3 gridDim, const unsigned int nb_rep, float tdiff[NB_META])
+int driver (const unsigned int size, dim3 blockDim, dim3 gridDim, const unsigned int nb_rep, const unsigned int nwu, float tdiff[NB_META])
 {
     const size_t size_bytes = size * size * sizeof(float);
 

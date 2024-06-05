@@ -103,9 +103,10 @@ check_option()
     type=""
     grid_size=""
     nrep=1
+    nwu=5
     plot=0
     plot_file="$WORKDIR/results/graph_$(date +%F-%T).png"
-    mydur=0
+    ROCPROF_ONLY=0
     MYDUR_METRICS=""
     block_size_values=""
     block_size_start=32
@@ -130,6 +131,7 @@ check_option()
             -o|--output) output=($2) ; shift 2 ;;
             -i|--input) input=($2) ; shift 2 ;;
             -n|--nrep) nrep=($2) ; shift 2 ;;
+            -w|--nwu) nwu=($2) ; shift 2 ;;
             -p|--plot) 
                 case "$2" in
                     "") plot=1; shift 2 ;;
@@ -141,7 +143,7 @@ check_option()
             -g|--grid-size)
                 grid_size_values="$2"
                 shift 2 ;;
-            --mydur) set_mydur ; shift ;;
+            --rocprof-only) ROCPROF_ONLY=1 ; shift ;;
             --) shift ; break ;;
             *) echo "No option $1."; usage ;;
         esac
@@ -162,41 +164,18 @@ check_option()
 
 check_args()
 {
-    if [ "$CMD" == "check" ]; then
-        if [ $# -ne 3 ]; then
-            echo "Need arguments."
-            usage
-        fi
-        PB_SIZE=$3
-
-    elif [ "$CMD" == "measure" ]; then
-        if [ $# -ne 4 ]; then
-            echo "Need arguments."
-            usage
-        fi
-        BENCH=$3
-        PB_SIZE=$4
-    fi 
-
+    if [ $# -ne 3 ]; then
+        echo "Need arguments."
+        usage
+    fi
     KERNEL=$1
     OPT=$2
+    PB_SIZE=$3
     BIN_PATH=$WORKDIR/benchmark/$KERNEL/build/bin
     DIM="ONE_DIM"
-    start=8
-    end=1024
-    step=8
-    if [[ "$KERNEL" == "matrixMultiply" && "$OPT" != "LINEAR" ]]; then
+    if [[ "$KERNEL" == "matrixMultiply" ]]; then
         DIM="TWO_DIM"
-        start=1
-        end=32
-        step=1
     fi
-}
-
-set_mydur()
-{
-    mydur=1
-    MYDUR_METRICS="MyDurationMin MyDurationMed Scalability "
 }
 
 ############################################################
@@ -216,8 +195,8 @@ run_command()
             check_args $ARGS
             run_check $@ ;;
         "measure" ) 
-            opt_list_short="hvn:o:b:g:p::" ; 
-            opt_list="help,rerun,mydur,verbose,nrep:,output:,block-size:,grid-size:,plot::" ; 
+            opt_list_short="hvn:w:o:b:g:p::" ; 
+            opt_list="help,rocprof-only,verbose,nrep:,nwu:,output:,block-size:,grid-size:,plot::" ; 
             check_option $@
             check_args $ARGS
             run_measure $@ ;;
@@ -345,59 +324,14 @@ get_gpu_info()
 
 run_measure()
 {
-    METRICS="DurationNs MeanOccupancyPerCU MeanOccupancyPerActiveCU GPUBusy Wavefronts L2CacheHit SALUInsts VALUInsts SFetchInsts"
     ROCPROF_OUTPUT=$TMPDIR/results.csv
     ROCPROF_INPUT=./config/input.txt
 
-    create_output_csv_file "Kernel Optimisation ProblemSize BlockSize GridSize $MYDUR_METRICS$METRICS"
+    create_output_csv_file
 
     log_printf "=== Benchmark $BENCH for $KERNEL ($OPT) with size: $PB_SIZE"
 
-    case "$BENCH" in
-        "basic") 
-              run_basic ;;
-        "blockSizeVar") 
-              run_blockSizeVar ;;
-        "gridSizeVar") 
-              run_gridSizeVar ;;
-        *) echo "OmniBench: "$BENCH" is not an available benchmark"; usage ;;
-    esac
-}
-
-run_blockSizeVar()
-{
-    build_driver measure $KERNEL $OPT
-    for block_size in $(seq $start $step $end) ; do
-        grid_size=$((($PB_SIZE + $block_size - 1) / $block_size))
-        echo_run "measure" $KERNEL $OPT $PB_SIZE $block_size $grid_size "($(( (block_size * 100) / end ))%)"
-        set_call_args $PB_SIZE $block_size $grid_size $nrep
-        rocprof_app
-        extract_rocprof_metrics_to $output
-    done
-    echo
-    echo "Result saved in '$output'"
-
-    if [ "$plot" == 1 ]; then
-        log_printf "=== Plot generation . . ."
-        python3 ./python/plot_from_csv.py "$output" "BlockSize" "DurationNs" --save_plot "$plot_file"
-        echo "Plot created in file $plot_file"
-    fi
-}
-
-run_gridSizeVar()
-{
-    build_driver measure $KERNEL $OPT
-    start=1
-    end=10000
-    step=10
-    for grid_size in $(seq $start $step $end) ; do
-        echo_run "measure" $KERNEL $OPT $PB_SIZE $block_size $grid_size "($(( (grid_size * 100) / end ))%)"
-        set_call_args $PB_SIZE $block_size $grid_size $nrep
-        rocprof_app
-        extract_rocprof_metrics_to $output
-    done
-    echo
-    echo "Result saved in '$output'"
+    run_basic
 }
 
 run_basic()
@@ -414,9 +348,9 @@ run_basic()
         for grid_size in $grid_size_seq; do
             counter=$((counter+1))
             echo_run "measure" $KERNEL $OPT $PB_SIZE $block_size $grid_size "($(percentage_finish $counter)%)"
-            set_call_args $PB_SIZE $block_size $grid_size $nrep
+            set_call_args $PB_SIZE $block_size $grid_size $nrep $nwu
             rocprof_app
-            extract_rocprof_metrics_to $output
+            echo "$(python3 python/extract_data_from_csv.py $output $TMPDIR/measure_tmp.out $TMPDIR/results.csv)"
         done
     done
     echo
@@ -429,13 +363,13 @@ percentage_finish()
     local length_block_seq=$(echo "$block_size_seq" | wc -l)
     local length_grid_seq=$(echo "$grid_size_seq" | wc -l)
     local total_lenght=$((length_block_seq+length_grid_seq))
-    local percentage=$(awk "BEGIN {print int($counter/$total_lenght*100)}")
+    local percentage=$(awk "BEGIN {print int(($counter+1)/$total_lenght*100)}")
     echo $percentage
 }
 
 call_driver()
 {
-    echo $BIN_PATH/measure $PB_SIZE $BLOCK_DIM $GRID_DIM $NB_REP
+    echo $BIN_PATH/measure $PB_SIZE $BLOCK_DIM $GRID_DIM $NB_REP $NWU
 }
 
 rocprof_app()
@@ -445,41 +379,17 @@ rocprof_app()
 
 create_output_csv_file()
 {
+    fieldnames="Kernel Optimization ProblemSize BlockSize GridSize DurationMed DurationMin Stability RocprofDurationMed RocprofDurationMin RocprofStability MeanOccupancyPerCU MeanOccupancyPerActiveCU GPUBusy Wavefronts L2CacheHit SALUInsts VALUInsts SFetchInsts"
+    
     if [[ -z $output ]]; then
         output="$RESULTDIR/"$KERNEL"_"$OPT"_"$PB_SIZE"_$(date +%F-%T).csv"
     fi
 
     if [[ ! -f "$output" ]]; then
-        formatted_header=$(echo "$1" | tr ' ' ',')
+        formatted_header=$(echo "$fieldnames" | tr ' ' ',')
         echo "$formatted_header" > "$output"
     fi
 }
-
-extract_rocprof_metrics_to()
-{
-    echo -n "$KERNEL" >> $1
-    echo -n ",$OPT" >> $1
-    echo -n ",$PB_SIZE" >> $1
-    echo -n ",$BLOCK_DIM" >> $1
-    echo -n ",$GRID_DIM" >> $1
-
-    if [[ "$mydur" -eq 1 ]]; then
-        time_min=$(grep 'time_min:' "$TMPDIR/measure_tmp.out" | cut -d ' ' -f 2)
-        time_med=$(grep 'time_med:' "$TMPDIR/measure_tmp.out" | cut -d ' ' -f 2)
-        stability=$(grep 'stability:' "$TMPDIR/measure_tmp.out" | cut -d ' ' -f 2)
-        echo -n ",$time_min" >> $1
-        echo -n ",$time_med" >> $1
-        echo -n ",$stability" >> $1
-    fi
-
-    for metric in $METRICS; do
-        col_num=$(head -1 $ROCPROF_OUTPUT| tr ',' '\n' | nl -v 0 | grep $metric | awk '{print $1}')
-        metric_value=$(awk -F, -v col=$((col_num+1)) 'NR > 0 {print $col}' $ROCPROF_OUTPUT | tail -n 1)
-        echo -n ",$metric_value" >> $1
-    done
-    echo "" >> $1
-}
-
 
 ############################################################
 # CHECK COMMAND                                            #
@@ -494,8 +404,11 @@ run_check()
 {
     local counter=0
     block_size_seq=$(seq $block_size_start $block_size_step $block_size_end)
+    build_driver check "$KERNEL" "$OPT"
     for block_size in $block_size_seq ; do
-        build_driver check "$KERNEL" "$OPT"
+        if [ "$OPT" == "TILE" ]; then
+            build_driver check "$KERNEL" "$OPT"
+        fi
         if [ "$grid_size_values" == "" ]; then
             grid_size_start=$((($PB_SIZE + $block_size - 1) / $block_size))
             grid_size_end=$grid_size_start
@@ -503,7 +416,7 @@ run_check()
         grid_size_seq=$(seq $grid_size_start $grid_size_step $grid_size_end)
         for grid_size in $grid_size_seq; do
             counter=$((counter+1))
-            set_call_args $PB_SIZE $block_size $grid_sizes
+            set_call_args $PB_SIZE $block_size $grid_sizes 
             eval $(call_driver_check)
         done
     done
@@ -551,8 +464,8 @@ echo_run()
 build_driver()
 {
     log_printf "=== Compilation $1 $2 ($3) . . ."
-    eval_verbose make kernel KERNEL=$2 OPT=$3 DIM=$DIM MYDUR=$mydur TILE_SIZE=$block_size -B
-    eval_verbose make $1 KERNEL=$2 OPT=$3 DIM=$DIM MYDUR=$mydur 
+    eval_verbose make kernel KERNEL=$2 OPT=$3 DIM=$DIM ROCPROF_ONLY=$ROCPROF_ONLY TILE_SIZE=$block_size -B
+    eval_verbose make $1 KERNEL=$2 OPT=$3 DIM=$DIM ROCPROF_ONLY=$ROCPROF_ONLY 
     check_error "compilation failed"
 }
 
@@ -562,8 +475,7 @@ set_call_args()
     BLOCK_DIM=$2
     GRID_DIM=$3
     NB_REP=$4
-    CHECK_OUT_FILE=$4
-    ONLY_GPU=$5
+    NWU=$5
 }
 
 log_printf "============== OMNIBENCH =============="

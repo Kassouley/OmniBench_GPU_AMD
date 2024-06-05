@@ -9,8 +9,8 @@ BIN_PATH	 = $(BUILD_PATH)/bin
 OPT 	?= NOPT
 DIM 	?= ONE_DIM
 CC 		 = hipcc
-CFLAGS	 = -O3 -D $(OPT) -D $(DIM) -fopenmp $(INC_FLAGS)
 KERNEL 	?= matrixMultiply
+CFLAGS	 = -O3 -D KERNEL_NAME=\"$(KERNEL)\" -D OPTIM=\"$(OPT)\" -D $(OPT) -D $(DIM) -fopenmp $(INC_FLAGS)
 
 ifeq ($(OPT), ROCBLAS)
 	LFLAGS += -lrocblas
@@ -19,9 +19,9 @@ ifeq ($(OPT), TILE)
 	CFLAGS += -D TILE_SIZE=$(TILE_SIZE)
 endif
 
-MYDUR ?= 0
-ifeq ($(MYDUR), 1)
-	CFLAGS += -D MYDUR
+ROCPROF_ONLY ?= 0
+ifeq ($(ROCPROF_ONLY), 1)
+	CFLAGS += -D ROCPROF_ONLY
 endif
 
 DIR_COMMON 		   := ./common

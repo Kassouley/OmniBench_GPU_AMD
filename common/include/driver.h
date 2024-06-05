@@ -14,7 +14,18 @@
 
 #define NB_META 31
 
-#ifdef MYDUR
+#ifdef ROCPROF_ONLY
+#define kernelBenchmark(tdiff, nwu, nrep, KERNEL, ...)   \
+    for (unsigned int i = 0; i < nwu; i++)  \
+    {  \
+        hipLaunchKernelGGL(KERNEL, __VA_ARGS__);  \
+    }  \
+    for (unsigned int i = 0; i < nrep; i++)  \
+    {  \
+        hipLaunchKernelGGL(KERNEL, __VA_ARGS__);  \
+    }  \
+    HIP_CHECK_CALL(hipDeviceSynchronize());
+#else
 #define kernelBenchmark(tdiff, nwu, nrep, KERNEL, ...)   \
     hipEvent_t start, stop;  \
     HIP_CHECK_CALL(hipEventCreate(&start));  \
@@ -47,19 +58,8 @@
     } \
     HIP_CHECK_CALL(hipEventDestroy(start));\
     HIP_CHECK_CALL(hipEventDestroy(stop));
-#else
-#define kernelBenchmark(tdiff, nwu, nrep, KERNEL, ...)   \
-    for (unsigned int i = 0; i < nwu; i++)  \
-    {  \
-        hipLaunchKernelGGL(KERNEL, __VA_ARGS__);  \
-    }  \
-    for (unsigned int i = 0; i < nrep; i++)  \
-    {  \
-        hipLaunchKernelGGL(KERNEL, __VA_ARGS__);  \
-    }  \
-    HIP_CHECK_CALL(hipDeviceSynchronize());
 #endif
 
-int driver (const unsigned int size, dim3 blockDim, dim3 gridDim, const unsigned int nrep, float tdiff[NB_META]);
+int driver (const unsigned int size, dim3 blockDim, dim3 gridDim, const unsigned int nrep, const unsigned int nwu, float tdiff[NB_META]);
 
 #endif

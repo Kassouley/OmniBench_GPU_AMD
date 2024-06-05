@@ -17,7 +17,7 @@ static int cmp_float (const void *a, const void *b)
     return 0;
 }
 
-void print_measure(unsigned int nrep, float tdiff[NB_META])
+void print_measure(unsigned int size, unsigned int block_dim, unsigned int grid_dim, unsigned int nrep, float tdiff[NB_META])
 {
     qsort (tdiff, NB_META, sizeof tdiff[0], cmp_float);
 
@@ -40,9 +40,9 @@ void print_measure(unsigned int nrep, float tdiff[NB_META])
     output = fopen(OUTPUT_FILE, "w");
     if (output != NULL) 
     {
-        fprintf(output, "time_min: %.0f\n", time_min * 1e6);
-        fprintf(output, "time_med: %.0f\n", time_med * 1e6);
-        fprintf(output, "stability: %.2f\n", stabilite);
+        fprintf(output, "kernel,optim,problem_size,block_size,grid_size,NB_META,nrep,time_min,time_med,stability\n");
+        fprintf(output, "%s,%s,%d,%d,%d,%d,%d,%.0f,%.0f,%.2f\n",
+                        KERNEL_NAME, OPTIM, size, block_dim, grid_dim, NB_META, nrep, time_min * 1e6, time_med * 1e6, stabilite);
         fclose(output);
     }
     else
@@ -60,12 +60,13 @@ int main (int argc, char* argv[])
     unsigned int block_dim;
     unsigned int grid_dim;
     unsigned int nrep;
+    unsigned int nwu;
     unsigned int size;
-    float tdiff[NB_META];
+    float tdiff[NB_META] = {0};
 
-    if (argc != 5 && argc != 4) 
+    if (argc != 6 && argc != 5) 
     {
-        fprintf (stderr, "Usage: %s <size> <block dim> [grid dim] <nb rep>\n", argv[0]);
+        fprintf (stderr, "Usage: %s <size> <block dim> [grid dim] <nb rep> <nwu>\n", argv[0]);
         return EXIT_FAILURE;
     }
     if (argc == 4)
@@ -74,6 +75,7 @@ int main (int argc, char* argv[])
         block_dim = atoi(argv[2]);
         grid_dim = (size + block_dim - 1) / block_dim;
         nrep = atoi(argv[3]); 
+        nwu = atoi(argv[4]); 
     }
     else 
     {
@@ -81,6 +83,7 @@ int main (int argc, char* argv[])
         block_dim = atoi(argv[2]);
         grid_dim = atoi(argv[3]);
         nrep = atoi(argv[4]); 
+        nwu = atoi(argv[5]); 
     }
 
     srand(0);
@@ -91,7 +94,7 @@ int main (int argc, char* argv[])
     log_printf("=== Run benchmark with size: %d, blockDim(%d, %d, %d), gridDim(%d, %d, %d), nrep: %d\n", 
                 size, blockDim.x, blockDim.y, blockDim.z, gridDim.x, gridDim.y, gridDim.z, nrep);
 
-    driver(size, blockDim, gridDim, nrep, tdiff);
+    driver(size, blockDim, gridDim, nrep, nwu, tdiff);
 
-    print_measure(nrep, tdiff);
+    print_measure(size, block_dim, grid_dim, nrep, tdiff);
 }

@@ -87,12 +87,13 @@ int main (int argc, char* argv[])
     }
 
     srand(0);
+    HIP_CHECK_CALL(hipDeviceReset());
 
     dim3 blockDim = GET_BLOCK_DIM(block_dim);
     dim3 gridDim = GET_GRID_DIM(grid_dim);
 
-    log_printf("=== Run benchmark with size: %d, blockDim(%d, %d, %d), gridDim(%d, %d, %d), nrep: %d\n", 
-                size, blockDim.x, blockDim.y, blockDim.z, gridDim.x, gridDim.y, gridDim.z, nrep);
+    log_printf("=== Run benchmark with size: %d, blockDim(%d, %d, %d), gridDim(%d, %d, %d), nrep: %d, nwu: %d\n", 
+                size, blockDim.x, blockDim.y, blockDim.z, gridDim.x, gridDim.y, gridDim.z, nrep, nwu);
 
     driver(size, blockDim, gridDim, nrep, nwu, tdiff);
 

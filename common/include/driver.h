@@ -20,6 +20,7 @@
     {  \
         hipLaunchKernelGGL(KERNEL, __VA_ARGS__);  \
     }  \
+    HIP_CHECK_CALL(hipDeviceSynchronize()); \
     for (unsigned int i = 0; i < nrep; i++)  \
     {  \
         hipLaunchKernelGGL(KERNEL, __VA_ARGS__);  \
@@ -37,17 +38,20 @@
             for (unsigned int i = 0; i < nwu; i++)  \
             {  \
                 hipLaunchKernelGGL(KERNEL, __VA_ARGS__);  \
+                HIP_CHECK_CALL(hipDeviceSynchronize());  \
             }  \
         }  \
         else  \
         {  \
             hipLaunchKernelGGL(KERNEL, __VA_ARGS__);  \
+            HIP_CHECK_CALL(hipDeviceSynchronize());  \
         }  \
         HIP_CHECK_CALL(hipDeviceSynchronize());  \
         HIP_CHECK_CALL(hipEventRecord(start, 0));  \
         for (unsigned int i = 0; i < nrep; i++)  \
         {  \
             hipLaunchKernelGGL(KERNEL, __VA_ARGS__);  \
+            HIP_CHECK_CALL(hipDeviceSynchronize());  \
         }  \
         HIP_CHECK_CALL(hipDeviceSynchronize());  \
         HIP_CHECK_CALL(hipEventRecord(stop, 0));  \

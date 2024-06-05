@@ -66,5 +66,5 @@ check: $(OBJ_COMMON_CHECK) $(OBJ_KERNEL_CHECK)
 
 clean:
 	rm -rf $(DIR_COMMON)/build/
-	rm -rf $(DIR_KERNEL)/build/
+	rm -rf $(BENCH_PATH)/*/build/
 	

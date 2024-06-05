@@ -6,7 +6,7 @@
 #include "driver.h"
 #include "common.h"
 
-int driver (const unsigned int size, dim3 blockDim, dim3 gridDim, const unsigned int nb_rep, const unsigned int nwu, float tdiff[NB_META])
+int driver (const unsigned int size, dim3 blockDim, dim3 gridDim, const unsigned int nrep, const unsigned int nwu, float tdiff[NB_META])
 {
     const size_t size_bytes = size * size * sizeof(float);
 
@@ -26,12 +26,15 @@ int driver (const unsigned int size, dim3 blockDim, dim3 gridDim, const unsigned
     HIP_CHECK_CALL(hipMemcpy(d_A, A, size_bytes, hipMemcpyHostToDevice));
     HIP_CHECK_CALL(hipMemcpy(d_B, B, size_bytes, hipMemcpyHostToDevice));
 
-    for (unsigned int i = 0; i < nb_rep; i++)
+    for (unsigned int i = 0; i < nrep; i++)
     {
         #ifdef ROCBLAS
             matrixMultiply(size, d_A, d_B, d_C);
         #else
-            matrixMultiply<<<gridDim, blockDim, 0, hipStreamDefault>>>(size, d_A, d_B, d_C);
+            kernelBenchmark(tdiff, nwu, nrep, 
+                        matrixMultiply, 
+                        gridDim, blockDim, 0, hipStreamDefault, 
+                        size, d_A, d_B, d_C);
         #endif
         HIP_CHECK_CALL(hipDeviceSynchronize());
     }

@@ -22,7 +22,7 @@ int driver (const unsigned int size, dim3 blockDim, dim3 gridDim, const unsigned
     HIP_CHECK_CALL(hipMalloc(&d_y, size_bytes));
     HIP_CHECK_CALL(hipMemcpy(d_x, x, size_bytes, hipMemcpyHostToDevice));
     HIP_CHECK_CALL(hipMemcpy(d_y, y, size_bytes, hipMemcpyHostToDevice));
-
+    
     kernelBenchmark(tdiff, nwu, nrep, 
                     saxpy, 
                     gridDim, blockDim, 0, hipStreamDefault, 

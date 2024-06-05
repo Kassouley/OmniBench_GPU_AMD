@@ -350,7 +350,7 @@ run_basic()
             echo_run "measure" $KERNEL $OPT $PB_SIZE $block_size $grid_size "($(percentage_finish $counter)%)"
             set_call_args $PB_SIZE $block_size $grid_size $nrep $nwu
             rocprof_app
-            echo "$(python3 python/extract_data_from_csv.py $output $TMPDIR/measure_tmp.out $TMPDIR/results.csv)"
+            echo "$(python3 python/extract_data_from_csv.py $output $TMPDIR/measure_tmp.out $TMPDIR/results.csv $nwu)"
         done
     done
     echo
@@ -404,11 +404,8 @@ run_check()
 {
     local counter=0
     block_size_seq=$(seq $block_size_start $block_size_step $block_size_end)
-    build_driver check "$KERNEL" "$OPT"
     for block_size in $block_size_seq ; do
-        if [ "$OPT" == "TILE" ]; then
-            build_driver check "$KERNEL" "$OPT"
-        fi
+        build_driver check "$KERNEL" "$OPT"
         if [ "$grid_size_values" == "" ]; then
             grid_size_start=$((($PB_SIZE + $block_size - 1) / $block_size))
             grid_size_end=$grid_size_start
@@ -465,7 +462,7 @@ build_driver()
 {
     log_printf "=== Compilation $1 $2 ($3) . . ."
     eval_verbose make kernel KERNEL=$2 OPT=$3 DIM=$DIM ROCPROF_ONLY=$ROCPROF_ONLY TILE_SIZE=$block_size -B
-    eval_verbose make $1 KERNEL=$2 OPT=$3 DIM=$DIM ROCPROF_ONLY=$ROCPROF_ONLY 
+    eval_verbose make $1 KERNEL=$2 OPT=$3 DIM=$DIM ROCPROF_ONLY=$ROCPROF_ONLY TILE_SIZE=$block_size
     check_error "compilation failed"
 }
 
@@ -488,5 +485,5 @@ mkdir -p "$RESULTDIR"
 cd "$WORKDIR"
 run_command "$@"
 
-rm "$TMPDIR" -rf
+# rm "$TMPDIR" -rf
 log_printf "================= END ================="

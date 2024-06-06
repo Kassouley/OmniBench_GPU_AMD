@@ -485,5 +485,5 @@ mkdir -p "$RESULTDIR"
 cd "$WORKDIR"
 run_command "$@"
 
-# rm "$TMPDIR" -rf
+rm "$TMPDIR" -rf
 log_printf "================= END ================="

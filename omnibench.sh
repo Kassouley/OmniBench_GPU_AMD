@@ -289,6 +289,8 @@ get_gpu_info()
     /^  Cacheline Size: / { cacheline_size = $3 }
     /^  Compute Unit: / { compute_unit = $3 }
     /^  SIMDs per CU: / { simds_per_cu = $4 }
+    /^  Max Waves Per CU: / { max_wave_per_cu = $5 }
+    /^  Max Work-item Per CU: / { max_thread_per_cu = $5 }
     /^  Wavefront Size: / { wavefront_size = $3 }
     /^  Workgroup Max Size:/ { workgroup_max_size = $4 }
     /^  / && cache_info == 1 { if ($1 == "L1:" || $1 == "L2:" || $1 == "L3:") { cache_sizes = cache_sizes "- "$1" " $2" " "KB" "\n" } }
@@ -304,6 +306,10 @@ get_gpu_info()
     print "Compute Unit:         " compute_unit
     print ""
     print "SIMDs per CU:         " simds_per_cu
+    print ""
+    print "Max Wave per CU:      " max_wave_per_cu
+    print ""
+    print "Max threads per CU:   " max_thread_per_cu
     print ""
     print "Wavefront Size:       " wavefront_size
     print ""

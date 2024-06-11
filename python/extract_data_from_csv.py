@@ -71,42 +71,40 @@ def main():
     csv2_path = sys.argv[3]
     nwu = int(sys.argv[4])
 
-    # try:
-        # Read values from the first CSV
-    csv1_columns = ['kernel', 'optim', 'problem_size', 'block_size', 'grid_size', 'time_med', 'time_min', 'stability']
-    probe_values = read_first_row_values(csv1_path, csv1_columns)
+    try:
+        csv1_columns = ['kernel', 'optim', 'problem_size', 'block_size', 'grid_size', 'time_med', 'time_min', 'stability']
+        probe_values = read_first_row_values(csv1_path, csv1_columns)
 
-    # Read values from the second CSV
-    csv = read_csv(csv2_path)[nwu:]
-    durations = extract_column(csv, 'DurationNs')
-    # rocprof_last_duration = durations[-1]
-    durations.sort()
-    rocprof_min_duration = durations[0]
-    rocprof_med_duration = durations[int(len(durations)/2)]
-    # rocprof_avg_duration = int(statistics.mean(durations))
-    rocprof_stability = calculate_stability(rocprof_min_duration, rocprof_med_duration)
-    rocprof_values = {
-        'time_min': rocprof_min_duration,
-        'time_med': rocprof_med_duration,
-        # 'time_avg': rocprof_avg_duration,
-        # 'time_last': rocprof_last_duration,
-        'stability': rocprof_stability
-    }
-    median_row = next(row for row in csv if int(row['DurationNs']) == rocprof_med_duration)
-    if median_row is None:
-        print("Error: Median row not found in the second CSV.")
-        sys.exit(1)
+        csv = read_csv(csv2_path)[nwu:]
+        durations = extract_column(csv, 'DurationNs')
+        # rocprof_last_duration = durations[-1]
+        durations.sort()
+        rocprof_min_duration = durations[0]
+        rocprof_med_duration = durations[int(len(durations)/2)]
+        # rocprof_avg_duration = int(statistics.mean(durations))
+        rocprof_stability = calculate_stability(rocprof_min_duration, rocprof_med_duration)
+        rocprof_values = {
+            'time_min': rocprof_min_duration,
+            'time_med': rocprof_med_duration,
+            # 'time_avg': rocprof_avg_duration,
+            # 'time_last': rocprof_last_duration,
+            'stability': rocprof_stability
+        }
+        median_row = next(row for row in csv if int(row['DurationNs']) == rocprof_med_duration)
+        if median_row is None:
+            print("Error: Median row not found in the second CSV.")
+            sys.exit(1)
 
-    write_output_to_csv(output_path, probe_values, rocprof_values, median_row)
+        write_output_to_csv(output_path, probe_values, rocprof_values, median_row)
 
-    # except FileNotFoundError as e:
-    #     print(f"Error: File not found - {e}")
-    # except KeyError as e:
-    #     print(f"Error: Missing expected column - {e}")
-    # except ValueError as e:
-    #     print(f"Error: {e}")
-    # except Exception as e:
-    #     print(f"An unexpected error occurred: {e}")
+    except FileNotFoundError as e:
+        print(f"Error: File not found - {e}")
+    except KeyError as e:
+        print(f"Error: Missing expected column - {e}")
+    except ValueError as e:
+        print(f"Error: {e}")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
 
 if __name__ == "__main__":
     main()

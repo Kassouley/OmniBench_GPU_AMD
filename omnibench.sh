@@ -116,6 +116,9 @@ check_option()
     grid_size_start=""
     grid_size_end=""
     grid_size_step=1
+    step_x=32
+    x_col="BlockSize"
+    y_col="RocprofDurationMed"
 
     TEMP=$(getopt -o $opt_list_short \
                     -l $opt_list \
@@ -144,6 +147,15 @@ check_option()
                 grid_size_values="$2"
                 shift 2 ;;
             --rocprof-only) ROCPROF_ONLY=1 ; shift ;;
+            -x)
+                x_col="$2"
+                shift 2 ;;
+            -y)
+                y_col="$2"
+                shift 2 ;;
+            --step_x)
+                step_x="$2"
+                shift 2 ;;
             --) shift ; break ;;
             *) echo "No option $1."; usage ;;
         esac
@@ -201,10 +213,9 @@ run_command()
             check_args $ARGS
             run_measure $@ ;;
         "export" )
-            opt_list_short="ho:i:" ; 
-            opt_list="help,output:,input:" ; 
+            opt_list_short="ho:i:x:y:" ; 
+            opt_list="help,output:,input:,step-x:" ; 
             check_option $@
-            check_args $ARGS
             run_export $@ ;;
        
         -h|--help) usage ;; 
@@ -223,13 +234,18 @@ run_export()
 {
     check_option $@
     if [[ -z "$input" ]]; then
-        echo "Need an input"
+        echo "Need an input CSV"
         usage
     fi
     if [[ -z "$output" ]]; then
         output="${input%.csv}.md"
     fi
+    output_png="${input%.csv}.png"
+    python3 python/plot_from_csv.py --save_plot "$output_png" "$input" "$x_col" "$step_x" "$y_col"
     echo "$(get_gpu_info)" > $output
+    echo "" >> $output
+    echo "## Graph Result" >> $output
+    echo "![graph_from_csv_results]($output_png)" >> $output
     echo "" >> $output
     echo "## CSV Data" >> $output
     csv_to_mdtable $output $input
@@ -244,37 +260,16 @@ format_cell()
 
 csv_to_mdtable()
 {
-    declare -a col_lengths
-
-    while IFS=',' read -r -a columns; do
-        for i in "${!columns[@]}"; do
-            len=${#columns[i]}
-            if [[ -z "${col_lengths[i]}" ]] || (( len > col_lengths[i] )); then
-                col_lengths[i]=$len
-            fi
-        done
-    done < "$2"
-
-    while IFS=',' read -r -a columns; do
-        if [ "$header" != "1" ]; then
-            for i in "${!columns[@]}"; do
-                format_cell "${columns[i]}" "${col_lengths[i]}" >> "$1"
-            done
-            printf "|\n" >> "$1"
-            
-            for length in "${col_lengths[@]}"; do
-                printf "| %-${length}s " "---" >> "$1"
-            done
-            printf "|\n" >> "$1"
-            
-            header=1
-        else
-            for i in "${!columns[@]}"; do
-                format_cell "${columns[i]}" "${col_lengths[i]}" >> "$1"
-            done
-            printf "|\n" >> "$1"
-        fi
-    done < "$2"
+    tmp=$(awk 'NR==1 {
+        n = split($0, cols, ",")
+        line = "---"
+        for (i = 2; i <= n; i++) line = line "," "---"
+        print $0
+        print line 
+        next
+        }
+        {print}' "$2")
+    echo "$tmp" | column -s, -t | sed 's/ \([a-zA-Z0-9\-]\)/| \1/g' >> "$1"
 }
 
 get_gpu_info()
@@ -489,6 +484,9 @@ RESULTDIR="$WORKDIR/results"
 mkdir -p "$TMPDIR"
 mkdir -p "$RESULTDIR"
 cd "$WORKDIR"
+
+make clean
+
 run_command "$@"
 
 rm "$TMPDIR" -rf
